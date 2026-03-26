@@ -1,0 +1,7 @@
+.venv/
+__pychace__/
+*.pyc
+data_log*.jsonl
+data_log*.csv
+microclimate.log
+cron.log
