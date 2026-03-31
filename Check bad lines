@@ -1,0 +1,21 @@
+import json
+
+path = "/home/designperformancelf/data_log_2026-03-30.jsonl"
+bad = 0
+total = 0
+
+with open(path, "r", encoding="utf-8", errors="replace") as f:
+    for i, line in enumerate(f, 1):
+        line = line.strip()
+        if not line:
+            continue
+        total += 1
+        try:
+            json.loads(line)
+        except Exception as e:
+            bad += 1
+            print(f"Bad line {i}: {e}")
+            if bad >= 10:
+                break
+
+print(f"Checked {total} lines, bad lines: {bad}")
