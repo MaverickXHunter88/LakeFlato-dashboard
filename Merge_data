@@ -1,0 +1,55 @@
+python3 - <<'PY'
+import json
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+local_tz = ZoneInfo("America/Chicago")
+
+main_file = "data_log_2026-03-30.jsonl"
+append_file = "data_log_2026-03-30Append.jsonl"
+output_file = "data_log_2026-03-30.merged.jsonl"
+
+rows = []
+
+def parse_sort_ts(row):
+    ts = row.get("timestamp")
+    if not ts:
+        return datetime.min
+    dt = datetime.fromisoformat(ts)
+    if dt.tzinfo:
+        dt = dt.astimezone(local_tz).replace(tzinfo=None)
+    return dt
+
+# main file
+with open(main_file) as f:
+    for line in f:
+        try:
+            rows.append(json.loads(line))
+        except:
+            pass
+
+# append file (convert UTC → local)
+with open(append_file) as f:
+    for line in f:
+        try:
+            row = json.loads(line)
+        except:
+            continue
+
+        ts = row.get("timestamp")
+        if ts:
+            dt = datetime.fromisoformat(ts)
+            if dt.tzinfo:
+                dt = dt.astimezone(local_tz).replace(tzinfo=None)
+                row["timestamp"] = dt.isoformat()
+
+        rows.append(row)
+
+rows.sort(key=parse_sort_ts)
+
+with open(output_file, "w") as f:
+    for r in rows:
+        f.write(json.dumps(r) + "\n")
+
+print("Merged file created:", output_file)
+PY
