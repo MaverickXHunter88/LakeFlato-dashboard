@@ -95,377 +95,373 @@ start_time = start_yesterday
 end_time = now_time
 
 #Create Subplots
-fig = make_subplots(
-   rows=4, cols=2,
-   shared_xaxes=True,
-   vertical_spacing=0.08,
-   horizontal_spacing=0.10,
-   subplot_titles=("Temperature (F)","Pressure (inHg)",
-      "Humidity (%)","Light (lux)", 
-      "CO2 (ppm)", "PM1.0 (ug/m3)", 
-      "PM2.5 (ug/m3)", "PM10 (ug/m3)"
-      )
+# ---------- Responsive dashboard rendering (replace old subplot section) ----------
+
+midnight = start_today
+latest = df_today.iloc[-1] if not df_today.empty else df.iloc[-1]
+
+def make_chart(
+    title,
+    older_x,
+    older_y,
+    today_x,
+    today_y,
+    color,
+    latest_x=None,
+    latest_y=None,
+    latest_label=None,
+    thresholds=None,
+    nonnegative=False,
+    y_format=None
+):
+    fig = go.Figure()
+
+    # Yesterday / older trace
+    if older_x is not None and older_y is not None and len(older_x) > 0:
+        fig.add_trace(go.Scatter(
+            x=older_x,
+            y=older_y,
+            mode="lines",
+            line=dict(color=color, width=2),
+            opacity=0.40,
+            showlegend=False,
+            hovertemplate="%{x|%m/%d %-I:%M %p}<br>%{y}<extra></extra>"
+        ))
+
+    # Today trace
+    if today_x is not None and today_y is not None and len(today_x) > 0:
+        fig.add_trace(go.Scatter(
+            x=today_x,
+            y=today_y,
+            mode="lines",
+            line=dict(color=color, width=3),
+            opacity=1.0,
+            showlegend=False,
+            hovertemplate="%{x|%m/%d %-I:%M %p}<br>%{y}<extra></extra>"
+        ))
+
+    # Thresholds
+    if thresholds:
+        for y in thresholds:
+            fig.add_hline(
+                y=y,
+                line_dash="dash",
+                line_color="white",
+                opacity=0.30
+            )
+
+    # Today divider
+    fig.add_vline(
+        x=midnight,
+        line_width=2,
+        line_dash="dot",
+        line_color="gray",
+        opacity=0.8
+    )
+
+    # Today label
+    fig.add_annotation(
+        x=midnight,
+        y=1.02,
+        xref="x",
+        yref="paper",
+        text="Today",
+        showarrow=False,
+        font=dict(color="white", size=12),
+        xanchor="left",
+        yanchor="bottom"
+    )
+
+    # Latest marker + label
+    if latest_x is not None and latest_y is not None:
+        fig.add_trace(go.Scatter(
+            x=[latest_x],
+            y=[latest_y],
+            mode="markers+text",
+            text=[latest_label] if latest_label else [""],
+            textposition="top right",
+            marker=dict(size=9, color="white"),
+            showlegend=False,
+            hovertemplate="%{x|%m/%d %-I:%M %p}<br>%{y}<extra></extra>"
+        ))
+
+    fig.update_layout(
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor="center",
+            font=dict(size=16, color="white")
+        ),
+        template="plotly_dark",
+        paper_bgcolor="black",
+        plot_bgcolor="black",
+        font=dict(color="white", size=11),
+        margin=dict(l=50, r=20, t=45, b=45),
+        height=290,
+        showlegend=False,
+        dragmode="pan"
+    )
+
+    fig.update_xaxes(
+        tickformat="%-I %p",
+        dtick=7200000,
+        tickangle=0,
+        showgrid=True,
+        zeroline=False,
+        range=[start_today, start_today + timedelta(days=1)]
+    )
+
+    if nonnegative:
+        fig.update_yaxes(rangemode="nonnegative")
+
+    if y_format:
+        fig.update_yaxes(tickformat=y_format)
+
+    return fig
+
+
+# Temperature
+temp_fig = make_chart(
+    title="Temperature (F)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["temperature_f"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["temperature_f"],
+    color="#FF6B6B",
+    latest_x=latest["timestamp"],
+    latest_y=latest["temperature_f"],
+    latest_label=f"{latest['temperature_f']:.0f}F"
 )
 
-#Add traces
+# Optional smoothed temperature overlay
+if "temp_smooth" in df_older.columns and not df_older["temp_smooth"].isna().all():
+    temp_fig.add_trace(go.Scatter(
+        x=df_older["timestamp"],
+        y=df_older["temp_smooth"],
+        mode="lines",
+        line=dict(color="#FFD166", width=2),
+        opacity=0.50,
+        showlegend=False,
+        hovertemplate="%{x|%m/%d %-I:%M %p}<br>%{y}<extra></extra>"
+    ))
 
-#Temp Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['temperature_f'],
-   line=dict(color="#FF6B6B"),
-   opacity=0.50,
-   showlegend=False),row=1, col=1)
-#Temp Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['temperature_f'],
-   line=dict(color="#FF6B6B",width=3),
-   opacity=1.0), row=1, col=1)
-#TempS Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'], 
-   y=df_older['temp_smooth'], 
-   line=dict(color="#FFD166"),
-   opacity=0.50,
-   showlegend=False), row=1, col=1)
-#TempS Today
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'], 
-   y=df_today['temp_smooth'], 
-   line=dict(color="#FFD166", width=3),
-   opacity=1.0), row=1, col=1)
-#Humidity Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['humidity_pct'],
-   line=dict(color="#4ECDC4"),
-   opacity=0.50,
-   showlegend=False),row=2, col=1)
-#Humidity Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['humidity_pct'],
-   line=dict(color="#4ECDC4",width=3),
-   opacity=1.0), row=2, col=1)   
-#Co2 Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['co2_ppm'],
-   line=dict(color="#A29BFE"),
-   opacity=0.50,
-   showlegend=False),row=3, col=1)
-#Co2 Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['co2_ppm'],
-   line=dict(color="#A29BFE",width=3),
-   opacity=1.0), row=3, col=1)
-fig.add_hline(y=800,line_dash="dash", line_color="white", opacity=0.4,row=3, col=1)
-fig.add_hline(y=1000,line_dash="dash", line_color="white", opacity=0.4, row=3, col=1)
-#PM25 Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['pm25_ugm3'],
-   line=dict(color="#FFD166"),
-   opacity=0.50,
-   showlegend=False),row=4, col=1)
-#PM25 Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['pm25_ugm3'],
-   line=dict(color="#FFD166",width=3),
-   opacity=1.0), row=4, col=1)
-fig.add_hline(y=12,line_dash="dash", line_color="white", opacity=0.4, row=4, col=1)
-fig.add_hline(y=35,line_dash="dash", line_color="white", opacity=0.4,row=4, col=1)
+if "temp_smooth" in df_today.columns and not df_today["temp_smooth"].isna().all():
+    temp_fig.add_trace(go.Scatter(
+        x=df_today["timestamp"],
+        y=df_today["temp_smooth"],
+        mode="lines",
+        line=dict(color="#FFD166", width=3),
+        opacity=1.0,
+        showlegend=False,
+        hovertemplate="%{x|%m/%d %-I:%M %p}<br>%{y}<extra></extra>"
+    ))
 
-#COLUMN 2
-#Pressure Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['pressure_inhg'],
-   line=dict(color="#9ecbff"),
-   opacity=0.50,
-   showlegend=False),row=1, col=2)
-#Pressure Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['pressure_inhg'],
-   line=dict(color="#9ecbff",width=3),
-   opacity=1.0), row=1, col=2)
-#Light Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['light_lux'],
-   line=dict(color="#FFD5DF"),
-   opacity=0.50,
-   showlegend=False),row=2, col=2)
-#Light Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['light_lux'],
-   line=dict(color="#FFD5DF",width=3),
-   opacity=1.0), row=2, col=2)
-#PM1 Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['pm1_ugm3'],
-   line=dict(color="#82b1ff"),
-   opacity=0.50,
-   showlegend=False),row=3, col=2)
-#PM1 Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['pm1_ugm3'],
-   line=dict(color="#82b1ff",width=3),
-   opacity=1.0), row=3, col=2)
-#PM10 Yesterday (Faded)
-fig.add_trace(go.Scatter(
-   x=df_older['timestamp'],
-   y=df_older['pm10_ugm3'],
-   line=dict(color="#ff8a80"),
-   opacity=0.50,
-   showlegend=False),row=4, col=2)
-#PM10 Today (bold)
-fig.add_trace(go.Scatter(
-   x=df_today['timestamp'],
-   y=df_today['pm10_ugm3'],
-   line=dict(color="#ff8a80",width=3),
-   opacity=1.0), row=4, col=2)
-fig.add_hline(y=54,line_dash="dash", line_color="white", opacity=0.4, row=4, col=2)
-fig.add_hline(y=154,line_dash="dash", line_color="white", opacity=0.4, row=4, col=2)
-
-midnight=start_today
-fig.add_vline(x=midnight, line_width=2, line_dash="dot", line_color="gray")
-fig.add_annotation(
-   x=midnight, 
-   y=1, xref="x",
-   yref="paper", text="Today",
-   showarrow=False,
-   font=dict(color="white"),
-   align="center",
-   xanchor="left",
-   yanchor="bottom"
+# Pressure
+pressure_fig = make_chart(
+    title="Pressure (inHg)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["pressure_inhg"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["pressure_inhg"],
+    color="#9ECBFF",
+    latest_x=latest["timestamp"],
+    latest_y=latest["pressure_inhg"],
+    latest_label=f"{latest['pressure_inhg']:.2f} inHg"
 )
 
-fig.add_annotation(
-   x=midnight, 
-   y=1, xref="x2",
-   yref="paper", text="Today",
-   showarrow=False,
-   font=dict(color="white"),
-   align="center",
-   xanchor="left",
-   yanchor="bottom"
+# Humidity
+humidity_fig = make_chart(
+    title="Humidity (%)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["humidity_pct"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["humidity_pct"],
+    color="#4ECDC4",
+    latest_x=latest["timestamp"],
+    latest_y=latest["humidity_pct"],
+    latest_label=f"{latest['humidity_pct']:.0f}%",
+    nonnegative=True
 )
 
-#---Current time marker (latest point)-----
-latest = df_today.iloc[-1]
-
-#Temperature
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["temperature_f"]],
-      mode="markers+text",
-      text=[f"{latest['temperature_f']:.0f}F"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=1, col=1
+# Light
+light_fig = make_chart(
+    title="Light (lux)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["light_lux"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["light_lux"],
+    color="#FFD5DF",
+    latest_x=latest["timestamp"],
+    latest_y=latest["light_lux"],
+    latest_label=f"{latest['light_lux']:.0f} lux",
+    nonnegative=True
 )
 
-#Smoothed Temperature
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["temp_smooth"]],
-      mode="markers",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=1, col=1
+# CO2
+co2_fig = make_chart(
+    title="CO2 (ppm)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["co2_ppm"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["co2_ppm"],
+    color="#A29BFE",
+    latest_x=latest["timestamp"],
+    latest_y=latest["co2_ppm"],
+    latest_label=f"{latest['co2_ppm']:.0f} ppm",
+    thresholds=[800, 1000],
+    nonnegative=True
 )
 
-#Humidity
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["humidity_pct"]],
-      mode="markers+text",
-      text=[f"{latest['humidity_pct']:.0f}%"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=2, col=1
+# PM1
+pm1_fig = make_chart(
+    title="PM1.0 (ug/m3)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["pm1_ugm3"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["pm1_ugm3"],
+    color="#82B1FF",
+    latest_x=latest["timestamp"],
+    latest_y=latest["pm1_ugm3"],
+    latest_label=f"{latest['pm1_ugm3']:.0f} ug/m3",
+    nonnegative=True
 )
 
-#C02
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["co2_ppm"]],
-      mode="markers+text",
-      text=[f"{latest['co2_ppm']:.0f}ppm"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=3, col=1
+# PM2.5
+pm25_fig = make_chart(
+    title="PM2.5 (ug/m3)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["pm25_ugm3"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["pm25_ugm3"],
+    color="#FFD166",
+    latest_x=latest["timestamp"],
+    latest_y=latest["pm25_ugm3"],
+    latest_label=f"{latest['pm25_ugm3']:.0f} ug/m3",
+    thresholds=[12, 35],
+    nonnegative=True
 )
 
-#PM25
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["pm25_ugm3"]],
-      mode="markers+text",
-      text=[f"{latest['pm25_ugm3']:.0f}ug/m3"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=4, col=1
+# PM10
+pm10_fig = make_chart(
+    title="PM10 (ug/m3)",
+    older_x=df_older["timestamp"],
+    older_y=df_older["pm10_ugm3"],
+    today_x=df_today["timestamp"],
+    today_y=df_today["pm10_ugm3"],
+    color="#FF8A80",
+    latest_x=latest["timestamp"],
+    latest_y=latest["pm10_ugm3"],
+    latest_label=f"{latest['pm10_ugm3']:.0f} ug/m3",
+    thresholds=[54, 154],
+    nonnegative=True
 )
 
-#COLUMN 2
-#Pressure
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["pressure_inhg"]],
-      mode="markers+text",
-      text=[f"{latest['pressure_inhg']:.2f} inHg"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=1, col=2
-)
+# Export each chart to HTML div
+temp_div = temp_fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True})
+pressure_div = pressure_fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
+humidity_div = humidity_fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
+light_div = light_fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
+co2_div = co2_fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
+pm1_div = pm1_fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
+pm25_div = pm25_fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
+pm10_div = pm10_fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
 
-#Light
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["light_lux"]],
-      mode="markers+text",
-      text=[f"{latest['light_lux']:.0f} Lux"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=2, col=2
-)
-
-#PM1
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["pm1_ugm3"]],
-      mode="markers+text",
-      text=[f"{latest['pm1_ugm3']:.0f} ug/m3"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=3, col=2
-)
-
-#PM10
-fig.add_trace(
-   go.Scatter(
-      x=[latest["timestamp"]],
-      y=[latest["pm10_ugm3"]],
-      mode="markers+text",
-      text=[f"{latest['pm10_ugm3']:.0f} ug/m3"],
-      textposition="top right",
-      marker=dict(size=10, color="white"),
-      showlegend=False
-   ),
-   row=4, col=2
-)
-
-fig.update_yaxes(rangemode="nonnegative", row=2, col=1) # Humidity
-fig.update_yaxes(rangemode="nonnegative", row=2, col=2) # Light
-fig.update_yaxes(rangemode="nonnegative", row=3, col=1) # CO2
-fig.update_yaxes(rangemode="nonnegative", row=3, col=2) # PM1
-fig.update_yaxes(rangemode="nonnegative", row=4, col=1) # PM2.5
-fig.update_yaxes(rangemode="nonnegative", row=4, col=2) # PM10
-
-#Layout
-fig.update_layout(
-   autosize=True,
-   title=dict(
-      text=(
-         "Miguel - Lake Flato Dashboard"
-         "<br><span style='font-size:12px;'>"
-         f"San Antonio, Texas | {start_yesterday:%m/%d %I:%M %p} to {now_time:%m/%d %I:%M %p}"
-         "</span>"
-      ),
-      x=0.02,
-      xanchor="left",
-      y=0.98,
-      yanchor="top",
-      font=dict(size=28, color="white")
-      ),
-   height=1200,
-   showlegend=False,
-   template="plotly_dark", #This is Key
-   paper_bgcolor="black",
-   plot_bgcolor="black",
-   font=dict(color="white", size =11),
-   dragmode="pan",
-   margin=dict(l=60, r=30, t=90, b=70)
-)
-
-#Clean subplot title Styling
-
-for ann in fig['layout']['annotations']:
-   ann['font']=dict(size=14, color='white')
-   
-end_of_today = start_today + timedelta(days=1)
-
-fig.update_xaxes(
-   tickformat="%-I %p",
-   dtick=7200000,
-   tickangle=0,
-   range=[start_today, end_of_today]
-)
-
-#Save HTML(IMPORTANT: use CDN)
-fig.write_html(
-   'microclimate_dashboard.html',
-   include_plotlyjs='cdn',
-   config={'responsive':True}
-)
-
-with open('microclimate_dashboard.html','r', encoding='utf-8') as f:
-   html=f.read()
-
-html=html.replace(
-   "<head>",
-   """<head>
-<meta http-equiv="refresh" contect="60">
+# Final responsive page
+html = f"""
+<html>
+<head>
+<meta http-equiv="refresh" content="60">
 <style>
-html, body {
-   margin: 0;
-   padding: 0;
-   background: black;
-   width: 100%;
-   height: 100%;
-   overflow: hidden;
-}
-.plotoly-graph-div {
-   width: 100vw !important;
-   height: 100vh !important;
-}
+html, body {{
+    margin: 0;
+    padding: 0;
+    background: black;
+    color: white;
+    font-family: Arial, sans-serif;
+}}
+
+.dashboard-header {{
+    padding: 16px 20px 8px 20px;
+}}
+
+.dashboard-header h1 {{
+    margin: 0;
+    font-size: 32px;
+    line-height: 1.15;
+}}
+
+.dashboard-header p {{
+    margin: 6px 0 0 0;
+    font-size: 14px;
+    color: #cccccc;
+}}
+
+.dashboard-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    padding: 16px 20px 24px 20px;
+    box-sizing: border-box;
+}}
+
+.chart-card {{
+    background: black;
+    border-radius: 10px;
+    overflow: hidden;
+}}
+
+.chart-card .plotly-graph-div {{
+    width: 100% !important;
+    height: 320px !important;
+}}
+
+@media (max-width: 900px) {{
+    .dashboard-header {{
+        padding: 14px 14px 6px 14px;
+    }}
+
+    .dashboard-header h1 {{
+        font-size: 24px;
+    }}
+
+    .dashboard-header p {{
+        font-size: 12px;
+    }}
+
+    .dashboard-grid {{
+        grid-template-columns: 1fr;
+        gap: 14px;
+        padding: 12px;
+    }}
+
+    .chart-card .plotly-graph-div {{
+        height: 300px !important;
+    }}
+}}
 </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <h1>Miguel - Lake Flato Dashboard</h1>
+        <p>San Antonio, Texas | {start_yesterday:%m/%d %I:%M %p} to {now_time:%m/%d %I:%M %p}</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="chart-card">{temp_div}</div>
+        <div class="chart-card">{pressure_div}</div>
+        <div class="chart-card">{humidity_div}</div>
+        <div class="chart-card">{light_div}</div>
+        <div class="chart-card">{co2_div}</div>
+        <div class="chart-card">{pm1_div}</div>
+        <div class="chart-card">{pm25_div}</div>
+        <div class="chart-card">{pm10_div}</div>
+    </div>
+</body>
+</html>
 """
-)
 
 with open("microclimate_dashboard.html", "w", encoding="utf-8") as f:
-   f.write(html)
+    f.write(html)
 
+print("Dashboard created")
 print("Dashboard created")
